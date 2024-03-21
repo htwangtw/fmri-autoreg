@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import argparse
+import logging
 import json
 import pickle as pk
 import csv
@@ -14,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 
 
-def train(params, data, verbose=1):
+def train(params, data, verbose=1, logger=logging):
     """Train a model according to params dict.
 
     Args:
@@ -42,7 +43,7 @@ def train(params, data, verbose=1):
             h5dset_path=X_tng_dsets[0],
             standardize=False,
             dtype="data"
-        )
+        )[0]
     n_emb = tmp.shape[1]
 
     # make model
@@ -77,7 +78,7 @@ def train(params, data, verbose=1):
         num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )
-
+    logger.info("created dataloader.")
     # train model
     model, losses, checkpoints = train_model(
         model=model,
@@ -85,6 +86,7 @@ def train(params, data, verbose=1):
         tng_dataloader=tng_dataloader,
         val_dataloader=val_dataloader,
         verbose=verbose,
+        logger=logger
     )
 
     # compute r2 score

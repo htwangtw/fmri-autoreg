@@ -9,6 +9,7 @@ from torch.nn import LSTM, GRU
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRMultivariate
+import logging
 
 from fmri_autoreg.tools import string_to_list
 
@@ -96,11 +97,11 @@ def make_model(params, n_emb, edge_index):
         )
         return model, train_backprop
 
-def model_fit(model, X_tng, Y_tng, verbose=1, **kwargs):
+def model_fit(model, X_tng, Y_tng, verbose=1, logger=logging,**kwargs):
     """Wrapper for model's fit method, to be consistent with backprop training method's outputs."""
     model.fit(X_tng, Y_tng)
     if verbose:
-        print("model fitted")
+        logger.info("model fitted")
     return model, None, []
 
 
@@ -110,17 +111,17 @@ def iter_fun(iterator, verbose):
     return iterator
 
 
-def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1):
+def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, logger=logging):
     """Backprop training of pytorch models, with epoch training loop. Returns trained model,
     losses and checkpoints."""
 
     if not cuda_is_available():
         device = "cpu"
-        print("CUDA not available, running on CPU.")
+        logger.info("CUDA not available, running on CPU.")
     else:
         device = params["torch_device"] if "torch_device" in params else DEVICE
         if verbose:
-            print(f"Using device {device}")
+            logger.info(f"Using device {device}")
 
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"])
@@ -180,7 +181,7 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1):
         losses["val"].append(mean_loss_val)
 
         if verbose > 1:
-            print("epoch", epoch, "tng loss", mean_loss_tng, "val loss", mean_loss_val)
+            logger.info("epoch", epoch, "tng loss", mean_loss_tng, "val loss", mean_loss_val)
 
         # add checkpoint
         if is_checkpoint:
@@ -205,6 +206,6 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1):
             checkpoint_scores.append(score_dict)
 
     if verbose:
-        print("model trained")
+        logger.info("model trained")
 
     return model, losses, checkpoint_scores
