@@ -1,4 +1,5 @@
 from typing import Dict, List, Tuple, Union
+from tqdm.auto import tqdm
 
 from pathlib import Path
 import os
@@ -211,7 +212,7 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
     """
     connectome_measure = ConnectivityMeasure(kind="correlation", discard_diagonal=True)
     avg_corr_mats = None
-    for dset in dset_paths:
+    for dset in tqdm(dset_paths):
         data = load_data(
             path=data_file,
             h5dset_path=dset,
