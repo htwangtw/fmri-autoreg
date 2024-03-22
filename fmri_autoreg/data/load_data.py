@@ -175,7 +175,7 @@ def make_input_labels(
             name="input",
             data=None,
             dtype=np.float32,
-            shape=(10, n_parcels, params["seq_len"])
+            shape=(10, n_parcels, params["seq_length"])
         )
         h5file.create_dataset(
             name="label",
@@ -190,13 +190,13 @@ def make_input_labels(
     for dset in tqdm(dset_paths):
         x, y = make_seq(
             dset,
-            params["seq_len"],
+            params["seq_length"],
             params["time_stride"],
             params["lag"]
         )
         cur_n_seq = x.shape[0]
         with h5py.File(output_file_path, "w") as h5file:
-            h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_len"]))
+            h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_length"]))
             h5file["input"][n_seq : n_seq + cur_n_seq] = x
             h5file["label"].resize((n_seq + cur_n_seq, n_parcels))
             h5file["label"][n_seq : n_seq + cur_n_seq] = y
