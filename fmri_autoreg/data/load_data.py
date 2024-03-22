@@ -188,8 +188,14 @@ def make_input_labels(
     log.info(f"Saving label and input to {output_file_path}.")
     n_seq = 0
     for dset in tqdm(dset_paths):
+        data = load_data(
+            path=data_file,
+            h5dset_path=dset,
+            standardize=False,
+            dtype="data"
+        )
         x, y = make_seq(
-            dset,
+            data,
             params["seq_length"],
             params["time_stride"],
             params["lag"]
