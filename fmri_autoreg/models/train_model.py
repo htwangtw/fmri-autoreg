@@ -1,3 +1,4 @@
+import h5py
 import numpy as np
 import os
 import argparse
@@ -37,31 +38,14 @@ def train(params, data, verbose=1, logger=logging):
         losses (numpy array): losses
         checkpoints (dict): scores and mean losses at checkpoint epochs
     """
-    X_tng_dsets, X_val_dsets, edge_index = data  # unpack data
-    tmp = load_data(
-            path=params["data_file"],
-            h5dset_path=X_tng_dsets[0],
-            standardize=False,
-            dtype="data"
-        )[0]
-    n_emb = tmp.shape[1]
+    tng_dsets, val_dsets, edge_index = data  # unpack data
+    with h5py.File(tng_dsets, "r") as h5file:
+        n_emb = h5file["label"].shape[1]
 
     # make model
     model, train_model = make_model(params, n_emb, edge_index)
-    tng_dataset = Dataset(
-        params["data_file"],
-        X_tng_dsets,
-        params["seq_length"],
-        params["time_stride"],
-        params["lag"]
-    )
-    val_dataset = Dataset(
-        params["data_file"],
-        X_val_dsets,
-        params["seq_length"],
-        params["time_stride"],
-        params["lag"]
-    )
+    tng_dataset = Dataset(tng_dsets)
+    val_dataset = Dataset(val_dsets)
     tng_dataloader = DataLoader(
         tng_dataset,
         batch_size=params["batch_size"],

@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, Union
 from tqdm.auto import tqdm
+import logging
 
 from pathlib import Path
 import os
@@ -129,7 +130,12 @@ def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=Fal
 
 
 def make_input_labels(
-    tng_data, val_data, seq_length, time_stride, lag, compute_edge_index=False, thres=0.9
+    data_file,
+    dset_paths,
+    params,
+    output_file_path=None,
+    compute_edge_index=False,
+    log=logging
 ):
     """Generate pairs of inputs and labels from time series.
 
@@ -151,16 +157,51 @@ def make_input_labels(
         Y_val (numpy array): validation labels, validation input, validation labels,
         edge_index (tuple of numpy arrays): edges of the connectivity matrix (None if compute_edge_index is False)
     """
-    X_tng, Y_tng = make_seq(tng_data, seq_length, time_stride, lag)
-    X_val, Y_val = make_seq(val_data, seq_length, time_stride, lag)
-
+    # create connectome from data set
+    n_parcels = int(params["scaling"]["atlas_desc"].split("desc-")[-1])
     if compute_edge_index:
-        tng_data_concat = np.concatenate(tng_data, axis=0)
-        edge_index = get_edge_index(tng_data_concat, thres)
+        thres = params["edge_index_thres"]
+        edge_index = get_edge_index(
+            data_file=data_file,
+            dset_paths=dset_paths,
+            threshold=thres,
+        )
+        log.info("Graph created")
     else:
         edge_index = None
 
-    return X_tng, Y_tng, X_val, Y_val, edge_index
+    with h5py.File(output_file_path, "w") as h5file:
+        h5file.create_dataset(
+            name="input",
+            data=None,
+            dtype=np.float32,
+            shape=(10, n_parcels, params["seq_len"])
+        )
+        h5file.create_dataset(
+            name="label",
+            data=None,
+            dtype=np.float32,
+            shape=(10, n_parcels)
+        )
+    if output_file_path is None:
+        output_file_path = "data.h5"
+    log.info(f"Saving label and input to {output_file_path}.")
+    n_seq = 0
+    for dset in tqdm(dset_paths):
+        x, y = make_seq(
+            dset,
+            params["seq_len"],
+            params["time_stride"],
+            params["lag"]
+        )
+        cur_n_seq = x.shape[0]
+        with h5py.File(output_file_path, "w") as h5file:
+            h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_len"]))
+            h5file["input"][n_seq : n_seq + cur_n_seq] = x
+            h5file["label"].resize((n_seq + cur_n_seq, n_parcels))
+            h5file["label"][n_seq : n_seq + cur_n_seq] = y
+    log.info(f"input label created at {output_file_path}.")
+    return output_file_path, edge_index
 
 
 def make_seq(data_list, length, stride=1, lag=1):
@@ -236,25 +277,19 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
 class Dataset:
     """Simple dataset for pytorch training loop"""
 
-    def __init__(self, data_file, dset_paths, seq_length, time_stride, lag):
+    def __init__(self, data_file):
         self.data_file = data_file
-        self.dset_paths = dset_paths
-        self.param = {"length": seq_length, "stride": time_stride, "lag": lag}
 
     def __len__(self):
-        return len(self.dset_paths)
+        with h5py.File(self.data_file, "r") as h5file:
+            length = h5file["label"].shape[0]
+        return length
 
     def __getitem__(self, index):
-        sample_dset = self.dset_paths[index]
         # read the data
-        input = load_data(
-            path=self.data_file,
-            h5dset_path=sample_dset,
-            standardize=False,
-            dtype="data"
-        )
-        # generate lables
-        X, Y = make_seq(input, **self.param)
+        with h5py.File(self.data_file, "r") as h5file:
+            X = h5file["input"][index, :, :]
+            Y = h5file["label"][index, :]
         sample = {
             "input": [torch.tensor(x, dtype=torch.float32) for x in X],
             "label": [torch.tensor(y, dtype=torch.float32) for y in Y]
