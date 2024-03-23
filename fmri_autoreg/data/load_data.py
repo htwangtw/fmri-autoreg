@@ -202,7 +202,7 @@ def make_input_labels(
                     data=None,
                     dtype=np.float32,
                     shape=(cur_n_seq, n_parcels),
-                    chunks=(n_parcels, params["seq_length"])
+                    chunks=(cur_n_seq, n_parcels)
                 )
             h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_length"]))
             h5file["input"][n_seq : n_seq + cur_n_seq] = x
