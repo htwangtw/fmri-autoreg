@@ -279,6 +279,7 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
     thres_value = np.sort(avg_corr_mats.flatten())[thres_index]
     adj_mat = avg_corr_mats * (avg_corr_mats >= thres_value)
     edge_index = np.nonzero(adj_mat)
+    edge_index = edge_index.astype(np.float32)
     return edge_index
 
 

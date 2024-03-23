@@ -43,9 +43,13 @@ def train(params, data, verbose=1, logger=logging):
         n_emb = h5file["label"].shape[1]
 
     # make model
+    if verbose > 1:
+        logger.info("making model.")
     model, train_model = make_model(params, n_emb, edge_index)
     tng_dataset = Dataset(tng_dsets)
     val_dataset = Dataset(val_dsets)
+    if verbose > 1:
+        logger.info("Creating dataloader.")
     tng_dataloader = DataLoader(
         tng_dataset,
         batch_size=params["batch_size"],
@@ -75,7 +79,7 @@ def train(params, data, verbose=1, logger=logging):
 
     # compute r2 score
     r2_mean = {}
-    for name, dset in zip(["tng", "val"], [X_tng_dsets, X_val_dsets]):
+    for name, dset in zip(["tng", "val"], [tng_dataloader, val_dataloader]):
         r2 = predict_model(
             model=model,
             params=params,
