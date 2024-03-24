@@ -38,8 +38,8 @@ def train(params, data, verbose=1, logger=logging):
         losses (numpy array): losses
         checkpoints (dict): scores and mean losses at checkpoint epochs
     """
-    tng_dsets, val_dsets, edge_index = data  # unpack data
-    with h5py.File(tng_dsets, "r") as h5file:
+    tng_data_h5, val_data_h5, edge_index = data  # unpack data
+    with h5py.File(tng_data_h5, "r") as h5file:
         n_emb = h5file["label"].shape[1]
 
     # make model
@@ -48,8 +48,8 @@ def train(params, data, verbose=1, logger=logging):
     model, train_model = make_model(params, n_emb, edge_index)
     if verbose > 1:
         logger.info("Creating dataloader.")
-    tng_dataset = Dataset(tng_dsets)
-    val_dataset = Dataset(val_dsets)
+    tng_dataset = Dataset(tng_data_h5)
+    val_dataset = Dataset(val_data_h5)
     tng_dataloader = DataLoader(
         tng_dataset,
         batch_size=params["batch_size"],
@@ -79,11 +79,11 @@ def train(params, data, verbose=1, logger=logging):
 
     # compute r2 score
     r2_mean = {}
-    for name, dset in zip(["tng", "val"], [tng_dsets, val_dsets]):
+    for name, dset in zip(["tng", "val"], [tng_data_h5, val_data_h5]):
         r2 = predict_model(
             model=model,
             params=params,
-            dset=dset,
+            data_h5=dset,
         )
         r2_mean[name] = np.mean(r2)
     return model, r2_mean['tng'], r2_mean['val'], losses, checkpoints
