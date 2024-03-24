@@ -79,11 +79,10 @@ def train(params, data, verbose=1, logger=logging):
 
     # compute r2 score
     r2_mean = {}
-    for name, dset in zip(["tng", "val"], [tng_dataloader, val_dataloader]):
+    for name, dset in zip(["tng", "val"], [tng_dsets, val_dsets]):
         r2 = predict_model(
             model=model,
             params=params,
-            data_file=params["data_file"],
             dset=dset,
         )
         r2_mean[name] = np.mean(r2)

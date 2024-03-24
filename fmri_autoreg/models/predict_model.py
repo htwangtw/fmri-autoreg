@@ -14,13 +14,7 @@ from fmri_autoreg.data.load_data import load_params, make_input_labels, Dataset
 
 def predict_model(model, params, dset):
     """Use trained model to predict on data and compute R2 score."""
-    dataset = Dataset(
-        params["data_file"],
-        dset,
-        params["seq_length"],
-        params["time_stride"],
-        params["lag"],
-    )
+    dataset = Dataset(dset)
     dataloader = DataLoader(
         dataset,
         batch_size=params["batch_size"],
