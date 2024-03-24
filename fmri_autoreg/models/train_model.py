@@ -46,10 +46,10 @@ def train(params, data, verbose=1, logger=logging):
     if verbose > 1:
         logger.info("making model.")
     model, train_model = make_model(params, n_emb, edge_index)
-    tng_dataset = Dataset(tng_dsets)
-    val_dataset = Dataset(val_dsets)
     if verbose > 1:
         logger.info("Creating dataloader.")
+    tng_dataset = Dataset(tng_dsets)
+    val_dataset = Dataset(val_dsets)
     tng_dataloader = DataLoader(
         tng_dataset,
         batch_size=params["batch_size"],
