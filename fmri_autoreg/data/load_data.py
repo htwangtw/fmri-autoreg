@@ -296,9 +296,9 @@ class Dataset:
     def __getitem__(self, index):
         # read the data
         with h5py.File(self.data_file, "r") as h5file:
-            X = h5file["input"][index, :, :]
-            Y = h5file["label"][index, :]
-        sample = {
+            X = np.array(h5file["input"][index, :, :])
+            Y = np.array(h5file["label"][index, :])
+        sample = {  # iterate through axis 0
             "input": [torch.tensor(x, dtype=torch.float32) for x in X],
             "label": [torch.tensor(y, dtype=torch.float32) for y in Y]
         }

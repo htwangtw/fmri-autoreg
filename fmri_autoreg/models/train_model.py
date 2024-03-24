@@ -44,7 +44,7 @@ def train(params, data, verbose=1, logger=logging):
 
     # make model
     if verbose > 1:
-        logger.info("making model.")
+        logger.info("Making model.")
     model, train_model = make_model(params, n_emb, edge_index)
     if verbose > 1:
         logger.info("Creating dataloader.")
@@ -66,7 +66,6 @@ def train(params, data, verbose=1, logger=logging):
         num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )
-    logger.info("created dataloader.")
     # train model
     model, losses, checkpoints = train_model(
         model=model,
