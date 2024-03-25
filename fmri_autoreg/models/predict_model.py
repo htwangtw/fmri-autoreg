@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 from sklearn.metrics import r2_score
-from fmri_autoreg.data.load_data import load_params, make_input_labels, Dataset
+from fmri_autoreg.data.load_data import load_params, make_seq, Dataset
 
 
 def predict_model(model, params, data_h5):
@@ -41,7 +41,7 @@ def predict_horizon(
     """For models trained to predict t+1, reuse predictions to iteratively predict to t+horizon."""
     with h5py.File(data_file, "r") as h5file:
         data_list = [h5file[dset_path][:]]
-    X = make_input_labels(data_list, [], seq_length + horizon, stride, 0)[0]
+    X, _ = make_seq(data_list, length=seq_length + horizon, stride=stride, lag=0)
     del data_list
     if not len(X):
         warnings.warn(f"No data found in {data_file} for {dset_path}", RuntimeWarning)
