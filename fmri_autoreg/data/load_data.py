@@ -195,7 +195,7 @@ def make_input_labels(
                     data=None,
                     dtype=np.float32,
                     shape=(cur_n_seq, n_parcels, params["seq_length"]),
-                    chunks=(50, n_parcels, params["seq_length"])
+                    chunks=(5, n_parcels, params["seq_length"])
                 )
                 h5file.create_dataset(
                     name="label",
