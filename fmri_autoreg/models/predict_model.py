@@ -25,8 +25,10 @@ def predict_model(model, params, data_h5):
     )
     r2 = []
     for sampled_batch in dataloader:
-        x, y = sampled_batch
+        x = sampled_batch["input"].to(params["torch_device"])
+        y = sampled_batch["label"].to(params["torch_device"])
         z = model.predict(x)
+        y = y.detach().cpu().numpy()
         batch_r2 = r2_score(y, z, multioutput="raw_values")
         r2.append(batch_r2)
     r2 = np.concatenate(r2, axis=0)
