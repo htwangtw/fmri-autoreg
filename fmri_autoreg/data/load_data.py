@@ -158,7 +158,7 @@ def make_input_labels(
         edge_index (tuple of numpy arrays): edges of the connectivity matrix (None if compute_edge_index is False)
     """
     # create connectome from data set
-    n_parcels = int(params["scaling"]["atlas_desc"].split("desc-")[-1])
+    n_parcels = params["n_embed"]
     if compute_edge_index:
         thres = params["edge_index_thres"]
         edge_index = get_edge_index(
