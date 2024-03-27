@@ -1,3 +1,7 @@
+from typing import Dict, List, Tuple, Union
+from tqdm.auto import tqdm
+import logging
+
 from pathlib import Path
 import os
 import re
@@ -24,46 +28,86 @@ def load_params(params):
     return param_dict
 
 
-def load_data(path, task_filter=None, standardize=False, shuffle=False):
-    """Load pre-processed data from HDF5 file.
+def load_data(
+    path: Union[Path, str],
+    h5dset_path: Union[List[str], str],
+    standardize: bool = False,
+    dtype: str = "data",
+) -> List[Union[np.ndarray, str, int, float]]:
+    """Load time series or phenotype data from the hdf5 files.
+
+    Args:
+        path (Union[Path, str]): Path to the hdf5 file.
+        h5dset_path (Union[List[str], str]): Path to data inside the
+            h5 file.
+        standardize (bool, optional): Whether to standardize the data.
+            Defaults to False. Only applicable to dtype='data'.
+        dtype (str, optional): Attribute label for each subject or
+            "data" to load the time series. Defaults to "data".
+
+    Returns:
+        List[Union[np.ndarray, str, int, float]]: loaded data.
+    """
+    if isinstance(h5dset_path, str):
+        h5dset_path = [h5dset_path]
+    data_list = []
+    if dtype == "data":
+        with h5py.File(path, "r") as h5file:
+            for p in h5dset_path:
+                data_list.append(h5file[p][:])
+        if standardize and data_list:
+            means = np.concatenate(data_list, axis=0).mean(axis=0)
+            stds = np.concatenate(data_list, axis=0).std(axis=0)
+            data_list = [(data - means) / stds for data in data_list]
+        return data_list
+    else:
+        with h5py.File(path, "r") as h5file:
+            for p in h5dset_path:
+                subject_node = "/".join(p.split("/")[:-1])
+                data_list.append(h5file[subject_node].attrs[dtype])
+        return data_list
+
+
+def load_h5_data_path(
+    path: Union[Path, str],
+    data_filter: Union[str, None] = None,
+    shuffle: bool = False,
+    random_state: int = 42,
+) -> List[str]:
+    """Load dataset path data from HDF5 file.
 
     Args:
       path (str): path to the HDF5 file
-      task_filter (str): regular expression to apply on run names (default=None)
-      standardize (bool): bool (default=False)
-      shuffle (bool): wether to shuffle the data (default=False)
+      data_filter (str): regular expression to apply on run names
+        (default=None)
+      shuffle (bool): whether to shuffle the data (default=False)
 
     Returns:
-      (list of numpy arrays): loaded data
+      (list of str): HDF5 path to data
     """
     data_list = []
     with h5py.File(path, "r") as h5file:
         for dset in _traverse_datasets(h5file):
-            if task_filter is None or re.search(task_filter, dset):
-                data_list.append(h5file[dset][:])
-    if standardize and data_list:
-        means = np.concatenate(data_list, axis=0).mean(axis=0)
-        stds = np.concatenate(data_list, axis=0).std(axis=0)
-        data_list = [(data - means) / stds for data in data_list]
+            if data_filter is None or re.search(data_filter, dset):
+                data_list.append(dset)
     if shuffle and data_list:
-        rng = np.random.default_rng()
-        data_list = [rng.shuffle(d) for d in data_list]
+        rng = np.random.default_rng(seed=random_state)
+        rng.shuffle(data_list)
     return data_list
 
 
 def _traverse_datasets(hdf_file):
     """Load nested hdf5 files.
     https://stackoverflow.com/questions/51548551/reading-nested-h5-group-into-numpy-array
-    """
-    def h5py_dataset_iterator(g, prefix=''):
+    """  # ruff: noqa: W505
+    def h5py_dataset_iterator(g, prefix=""):
         for key in g.keys():
             item = g[key]
-            path = f'{prefix}/{key}'
-            if isinstance(item, h5py.Dataset): # test for dataset
+            path = f"{prefix}/{key}"
+            if isinstance(item, h5py.Dataset):  # test for dataset
                 yield (path, item)
-            elif isinstance(item, h5py.Group): # test for group (go down)
+            elif isinstance(item, h5py.Group):  # test for group (go down)
                 yield from h5py_dataset_iterator(item, path)
-
     for path, _ in h5py_dataset_iterator(hdf_file):
         yield path
 
@@ -86,7 +130,12 @@ def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=Fal
 
 
 def make_input_labels(
-    tng_data, val_data, seq_length, time_stride, lag, compute_edge_index=False, thres=0.9
+    data_file,
+    dset_paths,
+    params,
+    output_file_path=None,
+    compute_edge_index=False,
+    log=logging
 ):
     """Generate pairs of inputs and labels from time series.
 
@@ -108,16 +157,59 @@ def make_input_labels(
         Y_val (numpy array): validation labels, validation input, validation labels,
         edge_index (tuple of numpy arrays): edges of the connectivity matrix (None if compute_edge_index is False)
     """
-    X_tng, Y_tng = make_seq(tng_data, seq_length, time_stride, lag)
-    X_val, Y_val = make_seq(val_data, seq_length, time_stride, lag)
-
+    # create connectome from data set
+    n_parcels = int(params["scaling"]["atlas_desc"].split("desc-")[-1])
     if compute_edge_index:
-        tng_data_concat = np.concatenate(tng_data, axis=0)
-        edge_index = get_edge_index(tng_data_concat, thres)
+        thres = params["edge_index_thres"]
+        edge_index = get_edge_index(
+            data_file=data_file,
+            dset_paths=dset_paths,
+            threshold=thres,
+        )
+        log.info("Graph created")
     else:
         edge_index = None
 
-    return X_tng, Y_tng, X_val, Y_val, edge_index
+    if output_file_path is None:
+        output_file_path = "data.h5"
+    log.info(f"Saving label and input to {output_file_path}.")
+    n_seq = 0
+    for dset in tqdm(dset_paths):
+        data = load_data(
+            path=data_file,
+            h5dset_path=dset,
+            standardize=False,
+            dtype="data"
+        )
+        x, y = make_seq(
+            data,
+            params["seq_length"],
+            params["time_stride"],
+            params["lag"]
+        )
+        cur_n_seq = x.shape[0]
+        with h5py.File(output_file_path, "w") as h5file:
+            if h5file.get("input") is None:
+                h5file.create_dataset(
+                    name="input",
+                    data=None,
+                    dtype=np.float32,
+                    shape=(cur_n_seq, n_parcels, params["seq_length"]),
+                    chunks=(5, n_parcels, params["seq_length"])
+                )
+                h5file.create_dataset(
+                    name="label",
+                    data=None,
+                    dtype=np.float32,
+                    shape=(cur_n_seq, n_parcels),
+                    chunks=(cur_n_seq, n_parcels)
+                )
+            h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_length"]))
+            h5file["input"][n_seq : n_seq + cur_n_seq] = x
+            h5file["label"].resize((n_seq + cur_n_seq, n_parcels))
+            h5file["label"][n_seq : n_seq + cur_n_seq] = y
+    log.info(f"input label created at {output_file_path}.")
+    return output_file_path, edge_index
 
 
 def make_seq(data_list, length, stride=1, lag=1):
@@ -155,11 +247,12 @@ def make_seq(data_list, length, stride=1, lag=1):
     return X_tot, Y_tot
 
 
-def get_edge_index(data, threshold=0.9):
-    """Create connectivity matrix.
+def get_edge_index(data_file, dset_paths, threshold=0.9):
+    """Create connectivity matrix with more memory efficient way.
 
     Args:
-      data (numpy array): time series data, of shape (time, nodes)
+      data_file: path to datafile
+      dset_path (list of str): path to time series data
       threshold (float): threshold used for the connectivity graph, e.g. 0.9 means that only the 10%
         strongest edges are kept (default=0.9)
 
@@ -167,10 +260,24 @@ def get_edge_index(data, threshold=0.9):
       (tuple of numpy array): edges of the connectivity matrix
     """
     connectome_measure = ConnectivityMeasure(kind="correlation", discard_diagonal=True)
-    corr_mat = connectome_measure.fit_transform([data])[0]
-    thres_index = int(corr_mat.shape[0] * corr_mat.shape[1] * threshold)
-    thres_value = np.sort(corr_mat.flatten())[thres_index]
-    adj_mat = corr_mat * (corr_mat >= thres_value)
+    avg_corr_mats = None
+    for dset in tqdm(dset_paths):
+        data = load_data(
+            path=data_file,
+            h5dset_path=dset,
+            standardize=False,
+            dtype="data"
+        )
+        corr_mat = connectome_measure.fit_transform(data)[0]
+        if avg_corr_mats is None:
+            avg_corr_mats = corr_mat
+        else:
+            avg_corr_mats += corr_mat
+    avg_corr_mats /= len(dset_paths)
+
+    thres_index = int(avg_corr_mats.shape[0] * avg_corr_mats.shape[1] * threshold)
+    thres_value = np.sort(avg_corr_mats.flatten())[thres_index]
+    adj_mat = avg_corr_mats * (avg_corr_mats >= thres_value)
     edge_index = np.nonzero(adj_mat)
     return edge_index
 
@@ -178,13 +285,23 @@ def get_edge_index(data, threshold=0.9):
 class Dataset:
     """Simple dataset for pytorch training loop"""
 
-    def __init__(self, X, Y):
-        self.inputs = [torch.tensor(x, dtype=torch.float32) for x in X]
-        self.labels = [torch.tensor(y, dtype=torch.float32) for y in Y]
+    def __init__(self, data_file):
+        self.data_file = data_file
 
     def __len__(self):
-        return len(self.inputs)
+        with h5py.File(self.data_file, "r") as h5file:
+            length = h5file["label"].shape[0]
+        return length
 
     def __getitem__(self, index):
-        sample = {"input": self.inputs[index], "label": self.labels[index]}
+        # read the data
+        with h5py.File(self.data_file, "r") as h5file:
+            X = h5file["input"][index, :, :]
+            Y = h5file["label"][index, :]
+        sample = {
+            "input": torch.tensor(X, dtype=torch.float32),
+            "label": torch.tensor(Y, dtype=torch.float32)
+        }
+        del X
+        del Y
         return sample
