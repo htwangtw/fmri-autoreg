@@ -154,7 +154,6 @@ def make_input_labels(
     if output_file_path is None:
         output_file_path = "data.h5"
     log.info(f"Saving label and input to {output_file_path}.")
-    n_seq = 0
     for dset in tqdm(dset_paths):
         data = load_data(
             path=data_file,
@@ -168,31 +167,26 @@ def make_input_labels(
             params["time_stride"],
             params["lag"]
         )
-        cur_n_seq = x.shape[0]
-        with h5py.File(output_file_path, "w") as h5file:
+        with h5py.File(output_file_path, "a") as h5file:
             if h5file.get("input") is None:
                 h5file.create_dataset(
                     name="input",
-                    data=None,
+                    data=x,
                     dtype=np.float32,
-                    shape=(cur_n_seq, n_parcels, params["seq_length"]),
                     maxshape=(None, n_parcels, params["seq_length"]),
-                    chunks=(cur_n_seq, n_parcels, params["seq_length"])
+                    chunks=(x.shape[0], n_parcels, params["seq_length"])
                 )
                 h5file.create_dataset(
                     name="label",
-                    data=None,
+                    data=y,
                     dtype=np.float32,
-                    shape=(cur_n_seq, n_parcels),
                     maxshape=(None, n_parcels),
-                    chunks=(cur_n_seq, n_parcels)
+                    chunks=(y.shape[0], n_parcels)
                 )
-            h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_length"]))
-            h5file["input"][n_seq : n_seq + cur_n_seq] = x
-            h5file["label"].resize((n_seq + cur_n_seq, n_parcels))
-            h5file["label"][n_seq : n_seq + cur_n_seq] = y
-            n_seq += cur_n_seq
-    log.info(f"input label created at {output_file_path}.")
+            h5file["input"].resize((h5file["input"].shape[0] + x.shape[0]), axis=0)
+            h5file["input"][-x.shape[0]:] = x
+            h5file["label"].resize((h5file["label"].shape[0] + y.shape[0]), axis=0)
+            h5file["label"][-y.shape[0]:] = y
     return output_file_path, edge_index
 
 
