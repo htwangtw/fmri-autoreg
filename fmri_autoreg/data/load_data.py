@@ -11,8 +11,6 @@ import json
 import pickle as pk
 import torch
 from nilearn.connectome import ConnectivityMeasure
-from darts import TimeSeries
-from darts.dataprocessing.transformers import Scaler
 from sklearn.preprocessing import StandardScaler
 
 
@@ -112,23 +110,6 @@ def _traverse_datasets(hdf_file):
         yield path
 
 
-def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=False):
-    ts_list = []
-    scaler = Scaler(scaler=StandardScaler())
-    rng = np.random.default_rng()
-    with h5py.File(path, "r") as h5file:
-        for key in list(h5file.keys()):
-            if task_filter is None or re.search(task_filter, key):
-                values = h5file[key][:].astype(np.float32)
-                if shuffle:
-                    values = rng.shuffle(values)
-                run_data = TimeSeries.from_values(values)
-                if standardize:
-                    run_data = scaler.fit_transform(run_data)
-                ts_list.append(run_data)
-    return ts_list
-
-
 def make_input_labels(
     data_file,
     dset_paths,
@@ -195,7 +176,7 @@ def make_input_labels(
                     data=None,
                     dtype=np.float32,
                     shape=(cur_n_seq, n_parcels, params["seq_length"]),
-                    chunks=(5, n_parcels, params["seq_length"])
+                    chunks=(1, n_parcels, params["seq_length"])
                 )
                 h5file.create_dataset(
                     name="label",
@@ -244,6 +225,10 @@ def make_seq(data_list, length, stride=1, lag=1):
     if len(X_tot) > 0:
         X_tot = np.concatenate(X_tot)
         Y_tot = np.concatenate(Y_tot)
+    if X_tot.shape[0] == 0:
+        #reshape to make the array 3D
+        X_tot = np.reshape(X_tot, (1, X_tot.shape[1], X_tot.shape[2]))
+        Y_tot = np.reshape(Y_tot, (1, Y_tot.shape[1]))
     return X_tot, Y_tot
 
 
