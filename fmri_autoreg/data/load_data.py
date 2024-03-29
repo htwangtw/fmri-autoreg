@@ -189,6 +189,7 @@ def make_input_labels(
             h5file["input"][n_seq : n_seq + cur_n_seq] = x
             h5file["label"].resize((n_seq + cur_n_seq, n_parcels))
             h5file["label"][n_seq : n_seq + cur_n_seq] = y
+            n_seq += cur_n_seq
     log.info(f"input label created at {output_file_path}.")
     return output_file_path, edge_index
 
@@ -258,12 +259,17 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
             avg_corr_mats = corr_mat
         else:
             avg_corr_mats += corr_mat
+        del data
+        del corr_mat
     avg_corr_mats /= len(dset_paths)
 
     thres_index = int(avg_corr_mats.shape[0] * avg_corr_mats.shape[1] * threshold)
     thres_value = np.sort(avg_corr_mats.flatten())[thres_index]
     adj_mat = avg_corr_mats * (avg_corr_mats >= thres_value)
+    del avg_corr_mats
+    del thres_value
     edge_index = np.nonzero(adj_mat)
+    del adj_mat
     return edge_index
 
 
