@@ -17,7 +17,7 @@ from fmri_autoreg.tools import string_to_list
 DEVICE = "cuda:0"
 
 
-def make_model(params, n_emb, edge_index):
+def make_model(params, edge_index):
     """Create a model according to given parameters, returns model and fitting function."""
 
     if params["model"] == "Ridge":
@@ -30,7 +30,7 @@ def make_model(params, n_emb, edge_index):
 
     elif params["model"] == "LRUnivariate":
         model = LRUnivariate(
-            n_emb,
+            params["n_embed"],
             params["seq_length"],
             params["F"],
             params["dropout"],
@@ -41,7 +41,7 @@ def make_model(params, n_emb, edge_index):
 
     elif params["model"] == "LRMultivariate":
         model = LRMultivariate(
-            n_emb,
+            params["n_embed"],
             params["seq_length"],
             params["F"],
             params["dropout"],
@@ -52,7 +52,7 @@ def make_model(params, n_emb, edge_index):
 
     elif params["model"] == "LSTM":
         model = LSTM(
-            n_emb,
+            params["n_embed"],
             params["hidden_size"],
             params["num_layers"],
             params["random_initial_state"],
@@ -62,7 +62,7 @@ def make_model(params, n_emb, edge_index):
 
     elif params["model"] == "GRU":
         model = GRU(
-            n_emb,
+            params["n_embed"],
             params["hidden_size"],
             params["num_layers"],
             params["random_initial_state"],
@@ -72,7 +72,7 @@ def make_model(params, n_emb, edge_index):
 
     elif params["model"] == "Chebnet":
         model = Chebnet(
-            n_emb,
+            params["n_embed"],
             params["seq_length"],
             edge_index,
             params["FK"],
@@ -85,7 +85,7 @@ def make_model(params, n_emb, edge_index):
         return model, train_backprop
     elif params["model"] == "LinearChebnet":
         model = LinearChebnet(
-            n_emb,
+            params["n_embed"],
             params["seq_length"],
             edge_index,
             params["FK"],
