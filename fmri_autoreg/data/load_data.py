@@ -154,7 +154,7 @@ def make_input_labels(
     if output_file_path is None:
         output_file_path = "data.h5"
     log.info(f"Saving label and input to {output_file_path}.")
-    for dset in tqdm(dset_paths):
+    for dset in dset_paths:
         data = load_data(
             path=data_file,
             h5dset_path=dset,
@@ -243,7 +243,7 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
     """
     connectome_measure = ConnectivityMeasure(kind="correlation", discard_diagonal=True)
     avg_corr_mats = None
-    for dset in tqdm(dset_paths):
+    for dset in dset_paths:
         data = load_data(
             path=data_file,
             h5dset_path=dset,
