@@ -176,13 +176,15 @@ def make_input_labels(
                     data=None,
                     dtype=np.float32,
                     shape=(cur_n_seq, n_parcels, params["seq_length"]),
-                    chunks=(1, n_parcels, params["seq_length"])
+                    maxshape=(None, n_parcels, params["seq_length"]),
+                    chunks=(cur_n_seq, n_parcels, params["seq_length"])
                 )
                 h5file.create_dataset(
                     name="label",
                     data=None,
                     dtype=np.float32,
                     shape=(cur_n_seq, n_parcels),
+                    maxshape=(None, n_parcels),
                     chunks=(cur_n_seq, n_parcels)
                 )
             h5file["input"].resize((n_seq + cur_n_seq, n_parcels, params["seq_length"]))
