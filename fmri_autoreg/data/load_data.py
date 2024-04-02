@@ -167,6 +167,11 @@ def make_input_labels(
             params["time_stride"],
             params["lag"]
         )
+        if x.shape[0] == 0 or x is None:
+            log.warning(
+                f"Skipping {dset} as label couldn't be created."
+            )
+            continue
         with h5py.File(output_file_path, "a") as h5file:
             if h5file.get("input") is None:
                 h5file.create_dataset(
@@ -222,11 +227,8 @@ def make_seq(data_list, length, stride=1, lag=1):
     if len(X_tot) > 0:
         X_tot = np.concatenate(X_tot)
         Y_tot = np.concatenate(Y_tot)
-    if X_tot.shape[0] == 0:
-        #reshape to make the array 3D
-        X_tot = np.reshape(X_tot, (1, X_tot.shape[1], X_tot.shape[2]))
-        Y_tot = np.reshape(Y_tot, (1, Y_tot.shape[1]))
-    return X_tot, Y_tot
+        return X_tot, Y_tot
+    return None, None
 
 
 def get_edge_index(data_file, dset_paths, threshold=0.9):
