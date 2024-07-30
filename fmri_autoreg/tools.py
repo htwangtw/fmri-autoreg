@@ -62,3 +62,31 @@ def load_model(path, n_emb=197):
         raise ValueError(f"Invalid model extension: '{ext}'. Should be '.pkl', '.pk' or '.pt'.")
 
     return model
+
+
+def chebnet_argument_resolver(model_parameters):
+    """Resolve the arguments of a Chebnet model from a dictionary of parameters."""
+    if 'layers' not in model_parameters:
+        return model_parameters
+    FK, M, aggrs = "", "", ""
+    for layer in model_parameters['layers']:
+        if 'F' in layer:
+            FK += f"{layer['F']},{layer['K']},"
+            aggrs += f"{layer['aggr']},"
+        if 'M' in layer:
+            M += f"{layer['M']},"
+    # remove last comma
+    FK = FK[:-1]
+    aggrs = aggrs[:-1]
+
+    # add the output layer to M
+    if M[-2] != "1":
+        M += "1"
+    else:
+        M = FK[:-1]  # remove last comma
+
+    # add to output
+    model_parameters['FK'] = FK
+    model_parameters['M'] = M
+    model_parameters['aggrs'] = aggrs
+    return model_parameters
