@@ -72,15 +72,16 @@ def make_model(params, edge_index):
 
     elif params["model"] == "Chebnet":
         model = Chebnet(
-            params["n_embed"],
-            params["seq_length"],
-            edge_index,
-            params["FK"],
-            params["M"],
-            params["FC_type"],
-            params["dropout"],
-            params["bn_momentum"],
-            params["use_bn"],
+            n_emb=params["n_embed"],
+            seq_len=params["seq_length"],
+            edge_index=edge_index,
+            FK=params["FK"],
+            M=params["M"],
+            FC_type=params["FC_type"],
+            aggrs=params["aggrs"],
+            dropout=params["dropout"],
+            bn_momentum=params["bn_momentum"],
+            use_bn=params["use_bn"],
         )
         return model, train_backprop
     elif params["model"] == "LinearChebnet":

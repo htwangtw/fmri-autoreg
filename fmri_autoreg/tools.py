@@ -68,6 +68,7 @@ def chebnet_argument_resolver(model_parameters):
     """Resolve the arguments of a Chebnet model from a dictionary of parameters."""
     if 'layers' not in model_parameters:
         return model_parameters
+
     FK, M, aggrs = "", "", ""
     for layer in model_parameters['layers']:
         if 'F' in layer:

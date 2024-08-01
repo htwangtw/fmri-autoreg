@@ -192,7 +192,8 @@ def make_input_labels(
             h5file["input"][-x.shape[0]:] = x
             h5file["label"].resize((h5file["label"].shape[0] + y.shape[0]), axis=0)
             h5file["label"][-y.shape[0]:] = y
-    return output_file_path, edge_index
+            input_size = h5file["input"].shape
+    return output_file_path, edge_index, input_size
 
 
 def make_seq(data_list, length, stride=1, lag=1):

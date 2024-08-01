@@ -106,8 +106,8 @@ class Chebnet(nn.Module):
             'nonshared_uni': each node uses a specific FC layer that uses as input only the features
                 of the node (univariate)
             'multi': output of each node is computed from features of every node (multivariate)
-        aggrs (str): aggregation methods for ChebConv layers, string of comma-seperated strings will 
-            be used for each layer. If no comma is presented, all layers will use the same 
+        aggrs (str): aggregation methods for ChebConv layers, string of comma-seperated strings will
+            be used for each layer. If no comma is presented, all layers will use the same
             aggrefation method (default='add').
         dropout (float): probability of an element being zeroed (default=0)
         bn_momentum (float): momentum for batch normalisation (default=0.1)
@@ -142,15 +142,15 @@ class Chebnet(nn.Module):
             aggrs = [aggrs] * len(K)
 
         layers = []
-        for i, aggr in zip(range(len(K)), aggrs):
+        for i in range(len(K)):
             layers.append(
                 ChebConv(
-                    in_channels=F[i], 
-                    out_channels=F[i + 1], 
-                    K=K[i], 
+                    in_channels=F[i],
+                    out_channels=F[i + 1],
+                    K=K[i],
                     normalization='sym',  # chev conv default
                     bias=True,  # chev conv default
-                    aggr=aggr,
+                    aggr=aggrs[i],
                 )
             )
             layers.append(nn.ReLU())
