@@ -66,28 +66,48 @@ def load_model(path, n_emb=197):
 
 def chebnet_argument_resolver(model_parameters):
     """Resolve the arguments of a Chebnet model from a dictionary of parameters."""
-    if 'layers' not in model_parameters:
+    if 'aggrs' not in model_parameters:
+        model_parameters['aggrs'] = "add"
+
+    if 'FK' in model_parameters:  # original method
         return model_parameters
 
-    FK, M, aggrs = "", "", ""
-    for layer in model_parameters['layers']:
-        if 'F' in layer:
-            FK += f"{layer['F']},{layer['K']},"
-            aggrs += f"{layer['aggr']},"
-        if 'M' in layer:
-            M += f"{layer['M']},"
-    # remove last comma
-    FK = FK[:-1]
-    aggrs = aggrs[:-1]
+    if 'layers' in model_parameters:  # detailed custom architecture
+        FK, M, aggrs = "", "", ""
+        for layer in model_parameters['layers']:
+            if 'F' in layer:
+                FK += f"{layer['F']},{layer['K']},"
+                aggrs += f"{layer['aggr']},"
+            if 'M' in layer:
+                M += f"{layer['M']},"
+        # remove last comma
+        FK = FK[:-1]
+        aggrs = aggrs[:-1]
 
-    # add the output layer to M
-    if M[-2] != "1":
+        # add the output layer to M
+        if M[-2] != "1":
+            M += "1"
+        else:
+            M = M[:-1]  # remove last comma
+
+        # add to output
+        model_parameters['FK'] = FK
+        model_parameters['M'] = M
+        model_parameters['aggrs'] = aggrs
+        return model_parameters
+
+    if 'GCL' in model_parameters:  # architecture scaling
+        FK, M, aggrs = "", "", ""
+        for i in range(model_parameters['GCL']):
+            FK += f"{model_parameters['F']},{model_parameters['K']},"
+            aggrs += f"{model_parameters['aggrs']},"
+        FK = FK[:-1]
+        aggrs = aggrs[:-1]
+
+        for i in range(model_parameters['FCL']):
+            M += f"{model_parameters['M']},"
         M += "1"
-    else:
-        M = FK[:-1]  # remove last comma
-
-    # add to output
-    model_parameters['FK'] = FK
-    model_parameters['M'] = M
-    model_parameters['aggrs'] = aggrs
-    return model_parameters
+        model_parameters['FK'] = FK
+        model_parameters['M'] = M
+        model_parameters['aggrs'] = aggrs
+        return model_parameters
