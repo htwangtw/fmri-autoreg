@@ -115,7 +115,7 @@ def make_input_labels(
     dset_paths,
     params,
     output_file_path=None,
-    compute_edge_index=False,
+    compute_edges=False,
     log=logging
 ):
     """Generate pairs of inputs and labels from time series.
@@ -126,7 +126,7 @@ def make_input_labels(
       seq_length (int): length of input sequences
       time_stride (int): stride of the sliding window
       lag (int): time points difference between the end of the input sequence and the time point used for label
-      compute_edge_index (bool): wether to compute a connectivity graph (for graph convolutions)
+      compute_edges (bool): wether to compute a connectivity graph (for graph convolutions)
       thres (float): threshold used for the connectivity graph, e.g. 0.9 means that only the 10%
         strongest edges are kept (default=0.9)
 
@@ -140,21 +140,19 @@ def make_input_labels(
     """
     # create connectome from data set
     n_parcels = params["n_embed"]
-    if compute_edge_index:
-        thres = params["edge_index_thres"]
-        edge_index = get_edge_index(
+    if compute_edges:
+        edges = get_edge_index(
             data_file=data_file,
             dset_paths=dset_paths,
-            threshold=thres,
         )
         log.info("Graph created")
     else:
-        edge_index = None
+        edges = None
 
     if output_file_path is None:
         output_file_path = "data.h5"
     log.info(f"Saving label and input to {output_file_path}.")
-    for dset in dset_paths:
+    for dset in tqdm(dset_paths):
         data = load_data(
             path=data_file,
             h5dset_path=dset,
@@ -193,7 +191,7 @@ def make_input_labels(
             h5file["label"].resize((h5file["label"].shape[0] + y.shape[0]), axis=0)
             h5file["label"][-y.shape[0]:] = y
             input_size = h5file["input"].shape
-    return output_file_path, edge_index, input_size
+    return output_file_path, edges, input_size
 
 
 def make_seq(data_list, length, stride=1, lag=1):
@@ -232,21 +230,19 @@ def make_seq(data_list, length, stride=1, lag=1):
     return None, None
 
 
-def get_edge_index(data_file, dset_paths, threshold=0.9):
+def get_edge_index(data_file, dset_paths):
     """Create connectivity matrix with more memory efficient way.
 
     Args:
       data_file: path to datafile
       dset_path (list of str): path to time series data
-      threshold (float): threshold used for the connectivity graph, e.g. 0.9 means that only the 10%
-        strongest edges are kept (default=0.9)
 
     Returns:
-      (tuple of numpy array): edges of the connectivity matrix
+      (numpy array): connectivity matrix
     """
     connectome_measure = ConnectivityMeasure(kind="correlation", discard_diagonal=True)
     avg_corr_mats = None
-    for dset in dset_paths:
+    for dset in tqdm(dset_paths):
         data = load_data(
             path=data_file,
             h5dset_path=dset,
@@ -261,7 +257,10 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
         del data
         del corr_mat
     avg_corr_mats /= len(dset_paths)
+    return avg_corr_mats
 
+
+def get_edge_index_threshold(avg_corr_mats, threshold=0.9):
     thres_index = int(avg_corr_mats.shape[0] * avg_corr_mats.shape[1] * threshold)
     thres_value = np.sort(avg_corr_mats.flatten())[thres_index]
     adj_mat = avg_corr_mats * (avg_corr_mats >= thres_value)
