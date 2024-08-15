@@ -12,9 +12,8 @@ from sklearn.metrics import r2_score
 from fmri_autoreg.data.load_data import load_params, make_seq, Dataset
 
 
-def predict_model(model, params, data_h5):
+def predict_model(model, params, dataset):
     """Use trained model to predict on data and compute R2 score."""
-    dataset = Dataset(data_h5)
     dataloader = DataLoader(
         dataset,
         batch_size=params["batch_size"],

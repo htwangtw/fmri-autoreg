@@ -12,7 +12,7 @@ from fmri_autoreg.data.load_data import load_data, Dataset
 from fmri_autoreg.models.make_model import make_model
 from fmri_autoreg.models.predict_model import predict_model
 from fmri_autoreg.tools import check_path
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.cuda import is_available as cuda_is_available
 
 
@@ -38,7 +38,7 @@ def train(params, data, verbose=1, logger=logging):
         losses (numpy array): losses
         checkpoints (dict): scores and mean losses at checkpoint epochs
     """
-    tng_data_h5, val_data_h5, edge_index = data  # unpack data
+    tng_data_h5, edge_index = data  # unpack data
 
     # make model
     if verbose > 1:
@@ -46,8 +46,22 @@ def train(params, data, verbose=1, logger=logging):
     model, train_model = make_model(params, edge_index)
     if verbose > 1:
         logger.info("Creating dataloader.")
-    tng_dataset = Dataset(tng_data_h5)
-    val_dataset = Dataset(val_data_h5)
+
+    if params["proportion_sample"] != 1:
+        with h5py.File(tng_data_h5, 'r') as f:
+            tng_length = f[f'n_embed-{params["n_embed"]}']['train']['input'].shape[0]
+            val_length = f[f'n_embed-{params["n_embed"]}']['val']['input'].shape[0]
+        tng_index = list(range(int(tng_length * params["proportion_sample"])))
+        val_index = list(range(int(val_length * params["proportion_sample"])))
+        tng_dataset = Subset(Dataset(tng_data_h5, n_embed=f'n_embed-{params["n_embed"]}', set_type="train"), tng_index)
+        val_dataset = Subset(Dataset(tng_data_h5, n_embed=f'n_embed-{params["n_embed"]}', set_type="val"), val_index)
+        logger.info(f"Using {len(tng_dataset)} samples for training and {len(val_dataset)} samples for validation.")
+    else:
+        tng_dataset = Dataset(tng_data_h5, n_embed=f'n_embed-{params["n_embed"]}', set_type="train")
+        val_dataset = Dataset(tng_data_h5, n_embed=f'n_embed-{params["n_embed"]}', set_type="val")
+        logger.info(f"Using {tng_length} samples for training and {val_length} samples for validation.")
+        logger.info("This is the full training sample.")
+
     tng_dataloader = DataLoader(
         tng_dataset,
         batch_size=params["batch_size"],
@@ -76,11 +90,11 @@ def train(params, data, verbose=1, logger=logging):
 
     # compute r2 score
     r2_mean = {}
-    for name, dset in zip(["tng", "val"], [tng_data_h5, val_data_h5]):
+    for name, dset in zip(["tng", "val"], [tng_dataset, val_dataset]):
         r2 = predict_model(
             model=model,
             params=params,
-            data_h5=dset,
+            dataset=dset,
         )
         r2_mean[name] = np.mean(r2)
     return model, r2_mean['tng'], r2_mean['val'], losses, checkpoints

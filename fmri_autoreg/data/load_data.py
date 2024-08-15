@@ -186,11 +186,13 @@ def make_input_labels(
                     maxshape=(None, n_parcels),
                     chunks=(y.shape[0], n_parcels)
                 )
-            h5file["input"].resize((h5file["input"].shape[0] + x.shape[0]), axis=0)
-            h5file["input"][-x.shape[0]:] = x
-            h5file["label"].resize((h5file["label"].shape[0] + y.shape[0]), axis=0)
-            h5file["label"][-y.shape[0]:] = y
-            input_size = h5file["input"].shape
+            else:
+                h5file["input"].resize((h5file["input"].shape[0] + x.shape[0]), axis=0)
+                h5file["input"][-x.shape[0]:] = x
+                h5file["label"].resize((h5file["label"].shape[0] + y.shape[0]), axis=0)
+                h5file["label"][-y.shape[0]:] = y
+    with h5py.File(output_file_path, "r") as h5file:
+        input_size = h5file["input"].shape
     return output_file_path, edges, input_size
 
 
@@ -242,7 +244,7 @@ def get_edge_index(data_file, dset_paths):
     """
     connectome_measure = ConnectivityMeasure(kind="correlation", discard_diagonal=True)
     avg_corr_mats = None
-    for dset in tqdm(dset_paths):
+    for dset in tqdm(dset_paths, desc="Computing connectivity matrix group average."):
         data = load_data(
             path=data_file,
             h5dset_path=dset,
@@ -274,19 +276,21 @@ def get_edge_index_threshold(avg_corr_mats, threshold=0.9):
 class Dataset:
     """Simple dataset for pytorch training loop"""
 
-    def __init__(self, data_file):
+    def __init__(self, data_file, n_embed, set_type="train"):
         self.data_file = data_file
+        self.n_embed = n_embed
+        self.set_type = set_type
 
     def __len__(self):
         with h5py.File(self.data_file, "r") as h5file:
-            length = h5file["label"].shape[0]
+            length = h5file[self.n_embed][self.set_type]["label"].shape[0]
         return length
 
     def __getitem__(self, index):
         # read the data
         with h5py.File(self.data_file, "r") as h5file:
-            X = h5file["input"][index, :, :]
-            Y = h5file["label"][index, :]
+            X = h5file[self.n_embed][self.set_type]["input"][index, :, :]
+            Y = h5file[self.n_embed][self.set_type]["label"][index, :]
         sample = {
             "input": torch.tensor(X, dtype=torch.float32),
             "label": torch.tensor(Y, dtype=torch.float32)
