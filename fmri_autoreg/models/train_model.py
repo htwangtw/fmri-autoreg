@@ -47,10 +47,11 @@ def train(params, data, verbose=1, logger=logging):
     if verbose > 1:
         logger.info("Creating dataloader.")
 
+    with h5py.File(tng_data_h5, 'r') as f:
+        tng_length = f[f'n_embed-{params["n_embed"]}']['train']['input'].shape[0]
+        val_length = f[f'n_embed-{params["n_embed"]}']['val']['input'].shape[0]
+
     if params["proportion_sample"] != 1:
-        with h5py.File(tng_data_h5, 'r') as f:
-            tng_length = f[f'n_embed-{params["n_embed"]}']['train']['input'].shape[0]
-            val_length = f[f'n_embed-{params["n_embed"]}']['val']['input'].shape[0]
         tng_index = list(range(int(tng_length * params["proportion_sample"])))
         val_index = list(range(int(val_length * params["proportion_sample"])))
         tng_dataset = Subset(Dataset(tng_data_h5, n_embed=f'n_embed-{params["n_embed"]}', set_type="train"), tng_index)

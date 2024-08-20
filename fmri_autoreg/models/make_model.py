@@ -182,7 +182,7 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, log
         losses["val"].append(mean_loss_val)
 
         if verbose > 1:
-            logger.info(f"epoch {epoch}, tng loss={mean_loss_tng}, val loss={mean_loss_val}")
+            logger.info(f"epoch {epoch+1}, tng loss={mean_loss_tng}, val loss={mean_loss_val}")
 
         # add checkpoint
         if is_checkpoint:
