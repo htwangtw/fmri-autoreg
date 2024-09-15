@@ -39,7 +39,7 @@ def train(params, data, verbose=1, logger=logging):
         checkpoints (dict): scores and mean losses at checkpoint epochs
     """
     tng_data_h5, edge_index = data  # unpack data
-
+    rng = np.random.default_rng(params["random_state"])
     # make model
     if verbose > 1:
         logger.info("Making model.")
@@ -67,7 +67,7 @@ def train(params, data, verbose=1, logger=logging):
         tng_dataset,
         batch_size=params["batch_size"],
         shuffle=True,
-        drop_last=True,
+        drop_last=False,
         num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )
@@ -75,7 +75,7 @@ def train(params, data, verbose=1, logger=logging):
         val_dataset,
         batch_size=params["batch_size"],
         shuffle=True,
-        drop_last=True,
+        drop_last=False,
         num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )

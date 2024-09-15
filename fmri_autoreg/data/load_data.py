@@ -291,10 +291,8 @@ class Dataset:
         with h5py.File(self.data_file, "r") as h5file:
             X = h5file[self.n_embed][self.set_type]["input"][index, :, :]
             Y = h5file[self.n_embed][self.set_type]["label"][index, :]
-        sample = {
-            "input": torch.tensor(X, dtype=torch.float32),
-            "label": torch.tensor(Y, dtype=torch.float32)
-        }
-        del X
-        del Y
+            sample = {
+                "input": torch.tensor(X, dtype=torch.float32),
+                "label": torch.tensor(Y, dtype=torch.float32)
+            }
         return sample

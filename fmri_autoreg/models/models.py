@@ -175,6 +175,7 @@ class Chebnet(nn.Module):
             else:
                 layers.append(nn.Dropout(dropout))
                 layers.append(make_FC_layer(M[i - 1], M[i]))
+                
             if i < len(M) - 1:
                 layers.append(nn.ReLU())
                 if use_bn:

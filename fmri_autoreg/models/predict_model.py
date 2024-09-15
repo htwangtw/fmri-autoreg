@@ -35,7 +35,7 @@ def predict_model(model, params, dataset):
 
 
 def predict_horizon(
-    model, seq_length, horizon, data_file, dset_path, batch_size, stride=1, standardize=False
+    model, seq_length, horizon, data_file, dset_path, batch_size, stride=1
 ):
     """For models trained to predict t+1, reuse predictions to iteratively predict to t+horizon."""
     with h5py.File(data_file, "r") as h5file:
@@ -47,11 +47,16 @@ def predict_horizon(
         return (None,) * 3
     Z = []
     Y = X[:, :, seq_length:]
+    if batch_size is None:
+        batch_size = X.shape[0]
+        n_batch = 1
+    else:
+        n_batch = (X.shape[0] - 1) // batch_size + 1
 
-    for i_batch in range((X.shape[0] - 1) // batch_size + 1):
+    for i_batch in range(n_batch):
         x_batch = X[i_batch * batch_size : (i_batch + 1) * batch_size, :, :seq_length]
         z_batch = []
-        for lag in range(1, horizon + 1):
+        for _ in range(1, horizon + 1):
             z_batch.append(np.expand_dims(model.predict(x_batch), axis=-1))
             x_batch = np.concatenate((x_batch[:, :, 1:], z_batch[-1]), axis=-1)
         Z.append(np.concatenate(z_batch, axis=-1))

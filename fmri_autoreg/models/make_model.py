@@ -4,9 +4,7 @@ from torch import optim
 from sklearn.metrics import r2_score
 from sklearn.linear_model import Ridge, Lasso
 from torch.nn import MSELoss
-from fmri_autoreg.data.load_data import Dataset
 from torch.nn import LSTM, GRU
-from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRMultivariate
 import logging
@@ -112,6 +110,14 @@ def iter_fun(iterator, verbose):
     return iterator
 
 
+def early_stopping(train_loss, validation_loss, min_delta, tolerance):
+    counter = 0
+    if (validation_loss - train_loss) > min_delta:
+        counter +=1
+        if counter >= tolerance:
+            return True
+
+
 def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, logger=logging):
     """Backprop training of pytorch models, with epoch training loop. Returns trained model,
     losses and checkpoints."""
@@ -128,9 +134,12 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, log
     optimizer = optim.Adam(model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"])
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
+        mode="min",
         factor=0.1,
         patience=params["lr_patience"],
         threshold=params["lr_thres"],
+        cooldown=0,
+        min_lr=0.000001,
     )
     loss_function = MSELoss().to(device)
     losses = {"tng": [], "val": []}
@@ -163,7 +172,6 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, log
                 all_preds_tng.append(preds.detach().cpu().numpy())
                 all_labels_tng.append(labels.detach().cpu().numpy())
         mean_loss_tng = mean_loss_tng / len(tng_dataloader)
-        scheduler.step(mean_loss_tng)
         losses["tng"].append(mean_loss_tng)
 
         # compute validation loss
@@ -180,9 +188,19 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, log
                 all_labels_val.append(labels.detach().cpu().numpy())
         mean_loss_val = mean_loss_val / len(val_dataloader)
         losses["val"].append(mean_loss_val)
+        # update learning rate
+        before_lr = optimizer.param_groups[0]["lr"]
+        scheduler.step(mean_loss_val)
+        after_lr = optimizer.param_groups[0]["lr"]
 
         if verbose > 1:
-            logger.info(f"epoch {epoch+1}, tng loss={mean_loss_tng}, val loss={mean_loss_val}")
+            message = (
+                f"epoch {epoch + 1} "
+                f"tng loss={mean_loss_tng}, val loss={mean_loss_val}"
+            )
+            if before_lr != after_lr:
+                message += f", lr: {before_lr} -> {after_lr}"
+            logger.info(message)
 
         # add checkpoint
         if is_checkpoint:
@@ -204,9 +222,19 @@ def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1, log
             score_dict["r2_std_val"] = r2_val.std()
             score_dict["loss_tng"] = mean_loss_tng
             score_dict["loss_val"] = mean_loss_val
+            score_dict["lr"] = before_lr
             checkpoint_scores.append(score_dict)
+            logger.info(
+                f"tng r2 mean={score_dict['r2_mean_tng']}, val r2 mean={score_dict['r2_mean_val']} "
+            )
+        
+        if "early_stopping" in params:
+            if early_stopping(mean_loss_tng, mean_loss_val, params["early_stopping"]["min_delta"], params["early_stopping"]["tolerance"]):
+                logger.info("Early stopping")
+                break
 
     if verbose:
         logger.info("model trained")
+        logger.info(f"final learning rate: {before_lr}")
 
     return model, losses, checkpoint_scores
